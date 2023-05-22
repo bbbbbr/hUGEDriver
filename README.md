@@ -4,7 +4,8 @@ This is a fork of [hUGEDriver](https://github.com/SuperDisk/hUGEDriver) which su
 
 More specifically it's a fork of a hUGEDriver version which plays compressed songs. That means it is ONLY compatible with songs exported from a version of hUGETracker that uses compression. Perfect for a 32K ROM.
 - You can find that original version of the Tracker here:
-  - https://github.com/SuperDisk/hUGETracker/actions/runs/3010801289
+  - ~~https://github.com/SuperDisk/hUGETracker/actions/runs/3010801289~~
+  - https://github.com/SuperDisk/hUGETracker/actions/runs/5051027676
 - And the original driver with compression here:
   - https://github.com/SuperDisk/hUGEDriver/tree/uncap
 
