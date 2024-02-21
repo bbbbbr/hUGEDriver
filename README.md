@@ -11,6 +11,10 @@ More specifically it's a fork of a hUGEDriver version which plays compressed son
 
 
 The source edits for MegaDuck are not opitmized for now, they're just `ifdef`ed in for ease of seeing what has to be handled differently. The changes should not add too much overhead though.
+### Non-compression, updated hUGEDriver
+- For an updated hUGEDriver version (6.1.1) without compression, also see:
+  - https://github.com/bbbbbr/hUGEDriver/tree/master_megaduck
+  - Binaries available in the releases tab of this repo
 
 ### Binaries
 Check Releases for compiled, ready-to-use object files
