@@ -472,6 +472,9 @@ update_channel_freq:
     call get_note_poly
     ld hl, step_width4
     or [hl]
+IF DEF(TARGET_MEGADUCK)
+    swap a
+ENDC
     ldh [rAUD4POLY], a
 
     ld a, d
@@ -555,6 +558,9 @@ play_ch4_note:
 
     ;; Play a "note" on channel 4 (noise)
     ld a, [channel_period4]
+IF DEF(TARGET_MEGADUCK)
+    swap a
+ENDC
     ldh [rAUD4POLY], a
 
     ;; Get the highmask and apply it.
@@ -791,8 +797,14 @@ fx_set_duty:
 .chan4:
     retMute 3
     ldh a, [rAUD4POLY]
+IF DEF(TARGET_MEGADUCK)
+    swap a
+ENDC
     res 3, a
     or c
+IF DEF(TARGET_MEGADUCK)
+    swap a
+ENDC
     ldh [rAUD4POLY], a
     ret
 .chan3:
@@ -925,23 +937,67 @@ fx_note_cut:
 
 ;;; Cuts note on a channel.
 ;;; Param: B = Current channel ID (0 = CH1, 1 = CH2, etc.)
+;;; Use NR12 (rAUD1ENV) as base address + Channel x 5
 ;;; Destroy: AF HL
 note_cut:
     ld a, b
+    ; MegaDuck envelope registers are not evenly spaced 5 apart as on the GB
+    ; so they can't be calculated using a base (CH1 env) + offset.
+    ; Select envelope register matching b (0=CH1, 1=CH2, 3=CH4, presume 2=unused)
+IF DEF(TARGET_MEGADUCK)
+    or a
+    jr z, .chan12
+    sub 1
+    jr z, .chan22
+    sub 1
+    jr z, .chan32
+    ld hl, rAUD4ENV       ; default to CH4 otherwise
+    jr .chanX2_done
+.chan12:
+    ld hl, rAUD1ENV
+    jr .chanX2_done
+.chan22:
+    ld hl, rAUD2ENV
+    jr .chanX2_done
+.chan32:
+    ld hl, rAUD3LEVEL
+.chanX2_done:
+ELSE
     add a
     add a
     add b ; multiply by 5
     add LOW(rAUD1ENV)
     ld l, a
     ld h, HIGH(rAUD1ENV)
+ENDC
+    ; MegaDuck NR12/22/42 nybble swaps don't matter for value of 0x00
+    ; Likewise NR32 Mute value is the same (Bits 6..5 = 00) for MegaDuck and GB
     xor a
     ld [hl+], a
     ld a, b
     cp 2
     ret z ; return early if CH3-- no need to retrigger note
 
-    ;; Retrigger note
+    ; MegaDuck sound registers do not increment linearly as on the GB
+    ; So incrementing after NR*2 won't point HL to NR*4 as intended (for trigger control)
+    ; No CH3 since it's filtered out above
+IF DEF(TARGET_MEGADUCK)
+    or a
+    jr z, .chan14
+    sub 1
+    jr z, .chan24
+    ld hl, rAUD4GO       ; default to CH4 otherwise
+    jr .chanX4_done
+.chan14:
+    ld hl, rAUD1HIGH
+    jr .chanX4_done
+.chan24:
+    ld hl, rAUD2HIGH
+.chanX4_done:
+ELSE
     inc l ; Not `inc hl` because H stays constant (= $FF)
+ENDC
+    ;; Retrigger note
     ld [hl], $FF
     ret
 
@@ -967,8 +1023,14 @@ fx_set_volume:
     retMute 0
 
     ldh a, [rAUD1ENV]
+IF DEF(TARGET_MEGADUCK)
+    swap a
+ENDC
     and %00001111
     or c
+IF DEF(TARGET_MEGADUCK)
+    swap a
+ENDC
     ldh [rAUD1ENV], a
     jp play_ch1_note
 
@@ -976,8 +1038,14 @@ fx_set_volume:
     retMute 1
 
     ldh a, [rAUD2ENV]
+IF DEF(TARGET_MEGADUCK)
+    swap a
+ENDC
     and %00001111
     or c
+IF DEF(TARGET_MEGADUCK)
+    swap a
+ENDC
     ldh [rAUD2ENV], a
     jp play_ch2_note
 
@@ -992,14 +1060,17 @@ fx_set_volume:
     jr nc, .two
     or a
     jr z, .done ; Zero maps to zero
+    ; NR32 volume
+    ; GB: Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
+    ; MD: Bits:6..5 : 00 = mute, 11 = 100%, 10 = 50%, 01 = 25%
 .three:
-    ld a, %01100000
+    ld a, AUDVOL_CH3_LO ; 25%
     jr .done
 .two:
-    ld a, %01000000
+    ld a, AUDVOL_CH3_MED ; 50%
     jr .done
 .one:
-    ld a, %00100000
+    ld a, AUDVOL_CH3_HI ; 100%
 .done:
     ldh [rAUD3LEVEL], a
     ret
@@ -1008,6 +1079,9 @@ fx_set_volume:
     retMute 3
 
     ld a, c
+IF DEF(TARGET_MEGADUCK)
+    swap a
+ENDC
     ldh [rAUD4ENV], a
     jp play_ch4_note
 
@@ -1318,15 +1392,57 @@ fx_vol_slide:
     ld e, a
     swap e
 
-    ; There are 5 bytes between each envelope register
     ld a, b
+IF DEF(TARGET_MEGADUCK)
+    ; MegaDuck envelope registers are not evenly spaced 5 apart as on the GB
+    ; so they can't be calculated using a base (CH1 env) + offset.
+    ; Select envelope register matching b (0=CH1, 1=CH2, 3=CH4, presume 2=unused)
+    or a
+    jr z, .chan12
+    sub 1
+    jr z, .chan22
+    sub 1
+    jr z, .chan32
+    ld c, LOW(rAUD4ENV)       ; default to CH4 otherwise
+    jr .chanX2_done
+.chan12:
+    ld c, LOW(rAUD1ENV)
+    jr .chanX2_done
+.chan22:
+    ld c, LOW(rAUD2ENV)
+    jr .chanX2_done
+.chan32:
+    ld c, LOW(rAUD3LEVEL)
+.chanX2_done:
+ELSE
+    ; There are 5 bytes between each envelope register
     add a
     add a
     add b
     add LOW(rAUD1ENV)
     ld c, a
+ENDC
 
     ldh a, [c]
+IF DEF(TARGET_MEGADUCK)
+    ; C is reading one of the envelope registers
+    ; So need to nybble swap output
+    ;
+    ; Except CH3 which is NOT inverted on MegaDuck (as CH1/2/4 ENV are)
+    ; Only the CH3 rNR32/rAUD3LEVEL addr LSByte has bit set on MegaDuck
+    bit 3, c
+    jr nz, .duck_load_ch3_volfix
+    swap a
+    jr .duck_load_done
+.duck_load_ch3_volfix:
+    ; Translate NR32 volume. New Volume = ((0x00 - Volume) & 0x60)
+    ; GB: Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
+    ; MD: Bits:6..5 : 00 = mute, 11 = 100%, 10 = 50%, 01 = 25%
+    cpl
+    add $20 ; start bit rollover at bit 5 to ignore possible values in lower bits (vs add 1)
+    and $60
+.duck_load_done:
+ENDC
     and %11110000
     swap a
     sub d
@@ -1338,12 +1454,54 @@ fx_vol_slide:
     jr c, .cont2
     ld a, $F
 .cont2:
+IF DEF(TARGET_MEGADUCK)
+    ; C is used to read one of the envelope registers
+    ; So DON'T nybble swap as on GB
+    ;
+    ; Except CH3 which is NOT inverted on MegaDuck (as CH1/2/4 ENV are)
+    ; Only the CH3 rNR32/rAUD3LEVEL addr LSByte has bit set on MegaDuck
+    bit 3, c
+    jr z, .duck_write_noswap
     swap a
+    ; Translate NR32 volume. New Volume = ((0x00 - Volume) & 0x60)
+    ; GB: Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
+    ; MD: Bits:6..5 : 00 = mute, 11 = 100%, 10 = 50%, 01 = 25%
+    cpl
+    add $20 ; start bit rollover at bit 5 to ignore possible values in lower bits (vs add 1)
+    and $60
+.duck_write_noswap:
+ELSE
+    swap a
+ENDC
     ldh [c], a
 
     ; Go to rAUDxGO, which is 2 bytes after
+
+    ; MegaDuck sound registers do not increment linearly as on the GB
+    ; So incrementing after NR*2 won't point HL to NR*4 as intended (for trigger control)
+IF DEF(TARGET_MEGADUCK)
+    ld a, b
+    or a
+    jr z, .chan14
+    sub 1
+    jr z, .chan24
+    sub 1
+    jr z, .chan34
+    ld c, LOW(rAUD4GO)       ; default to CH4 otherwise
+    jr .chanX4_done
+.chan14:
+    ld c, LOW(rAUD1HIGH)
+    jr .chanX4_done
+.chan24:
+    ld c, LOW(rAUD2HIGH)
+    jr .chanX4_done
+.chan34:
+    ld c, LOW(rAUD3HIGH)
+.chanX4_done:
+ELSE
     inc c
     inc c
+ENDC
     ldh a, [c]
     or %10000000
     ldh [c], a
@@ -1358,8 +1516,12 @@ fx_vol_slide:
 ;;; Param: ZF = Set if and only if on tick 0
 ;;; Destroy: AF D HL
 fx_note_delay:
+IF DEF(TARGET_MEGADUCK)
+    ;; MegaDuck changes put the jump out of reach for a jr
+    jp z, ret_dont_play_note
+ELSE
     jr z, ret_dont_play_note
-
+ENDC
     cp c
     ret nz ; wait until the correct tick to play the note
 
@@ -1454,6 +1616,9 @@ ENDC
     ld a, [hl+]
     ldh [rAUD1LEN], a
     ld a, [hl+]
+IF DEF(TARGET_MEGADUCK)
+    swap a
+ENDC
     ldh [rAUD1ENV], a
     ld a, [hl+]
     ld [table1], a
@@ -1518,6 +1683,9 @@ process_ch2:
     ld a, [hl+]
     ldh [rAUD2LEN], a
     ld a, [hl+]
+IF DEF(TARGET_MEGADUCK)
+    swap a
+ENDC
     ldh [rAUD2ENV], a
     ld a, [hl+]
     ld [table2], a
@@ -1579,6 +1747,14 @@ process_ch3:
     ld a, [hl+]
     ldh [rAUD3LEN], a
     ld a, [hl+]
+IF DEF(TARGET_MEGADUCK)
+    ; Translate NR32 volume. New Volume = ((0x00 - Volume) & 0x60)
+    ; GB: Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
+    ; MD: Bits:6..5 : 00 = mute, 11 = 100%, 10 = 50%, 01 = 25%
+    cpl
+    add $20 ; start bit rollover at bit 5 to ignore possible values in lower bits (vs add 1)
+    and $60
+ENDC
     ldh [rAUD3LEVEL], a
     ld a, [hl+]
     push hl
@@ -1650,6 +1826,9 @@ process_ch4:
     checkMute 3, .do_setvol4
 
     ld a, [hl+]
+IF DEF(TARGET_MEGADUCK)
+    swap a
+ENDC
     ldh [rAUD4ENV], a
 
     ld a, [hl+]

@@ -1,3 +1,45 @@
+# Fork of hUGEDriver for the Mega Duck (version without compression)
+This is a fork of [hUGEDriver](https://github.com/SuperDisk/hUGEDriver) which supports running on the Mega Duck (a console clone of the Game Boy with some register address and bit order changes).
+
+- If you want the MegaDuck version with compression, see here: https://github.com/bbbbbr/hUGEDriver/tree/uncap
+
+The source edits for MegaDuck are not opitmized, they're just `ifdef`ed in for ease of seeing what has to be handled differently. The changes should not add much overhead though.
+
+### Binaries
+Check Releases for compiled, ready-to-use object files
+
+### Building (GBDK)
+
+- Have RGBDS and GBDK-2020 installed and in the system path
+
+- Mega Duck
+  - `cd gbdk_example`
+  - `mkdir obj; mkdir build; mkdir lib`
+  - `rgbasm -DGBDK -DTARGET_MEGADUCK -o./obj/hUGEDriver_megaduck.obj -i.. ../hUGEDriver.asm`
+  - `python ../tools/rgb2sdas.py -o obj/hUGEDriver_megaduck.o obj/hUGEDriver_megaduck.obj`
+  - `sdar -ru lib/hUGEDriver_megaduck.lib obj/hUGEDriver_megaduck.o`
+  - Produces: `lib/hUGEDriver_megaduck.lib`
+  - Build example: `lcc -msm83:duck -I../include -Wl-llib/hUGEDriver_megaduck.lib -o build/gbdk_player_example.duck src/gbdk_player_example.c src/sample_song.c`
+
+- Game Boy (if needed)
+  - `cd gbdk_example`
+  - `mkdir obj; mkdir build; mkdir lib`
+  - `rgbasm -DGBDK -o./obj/hUGEDriver.obj -i.. ../hUGEDriver.asm`
+  - `python ../tools/rgb2sdas.py -o obj/hUGEDriver.o obj/hUGEDriver.obj`
+  - `sdar -ru lib/hUGEDriver.lib obj/hUGEDriver.o`
+  - Produces: `lib/hUGEDriver.lib`
+  - Build example: `lcc -I../include -Wl-llib/hUGEDriver.lib -o build/gbdk_player_example.gb src/gbdk_player_example.c src/sample_song.c`
+
+### To make either resulting object file compatible with older GBDK versions before GBDK-2020 4.1.0
+- Edit the resulting `.lib` file and replace `-msm83` with `-mgbz80`
+
+---------------------------
+
+# Original Repo Readme Contents Below
+(Many thanks to SuperDisk for making hUGEDriver and hUGETracker!)
+
+---------------------------
+
 ![hUGEDriver](https://github.com/SuperDisk/hUGEDriver/assets/1688837/a6079751-20b5-4db3-bb48-0e748234f8ca)
 ===
 
