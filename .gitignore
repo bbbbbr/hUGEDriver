@@ -6,10 +6,12 @@
 *.o
 *.lnk
 obj/
+build/
 *.htt
 *.exe
 *.bak
 *.lib
+*.sublime-*
 
 rgbasm
 rgbfix
